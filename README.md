@@ -1,2 +1,1 @@
-# ProgrammingSQLServerDatabaseStoredProcedures
-Programming SQL Server Database Stored Procedures
+# Programming SQL Server Database Stored Procedures

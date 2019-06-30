@@ -62,11 +62,56 @@
        ```
         
         - Always make sure you are in a correct database by using the USE statement.
-        - Semicolon(;) is not mandatory at the end of each SQL statements, But [Microsoft](https://www.microsoft.com/en-us/ , "Microsoft") recommends as it might become mandatory in the future.
+        - Semicolon(;) is not mandatory at the end of each SQL statements, But [Microsoft](https://www.microsoft.com/en-us/ "Microsoft") recommends as it might become mandatory in the future.
      
+        Altering Stored Procedure
+         
+         ```
+             Use Contacts;
+
+             GO
+
+             ALTER PROCEDURE dbo.SelectContacts
+             AS
+             BEGIN;--//SP BEGIN
+
+             SELECT * FROM dbo.Contacts WHERE FirstName = 'Grace';
+
+             END--//SP END
+         ```
         
         
    - Managing Procedures Using SQL Server Management Studio
+      - Stored Procedures
+      - Natively Compiled Stored Procedures
+         - Natively compiled stored procedures where first introduced ib SQL Server 2014.
+         - When created they are compiled into _C programming language_ and are available to immediate use.
+         - Natively Compiled Stored Procedures can only access in-memort tables, which are fairly advanced feature of SQL Server.
+         - In-memory tables are fast and can be accessed fairly faster by the natively compiled stored procedures as opposed to regular stored procedures.
+   
+      Drop Stored Procedures
+      
+      ```
+         DROP PROCEDURE IF EXISTS dbo.SelectContacts; --//IF EXISTS is only availabe in SQL Server 2017 and above
+      ```
+      
+       - If yoy are using SQL Server versions before 2017 then you need to check the metadata table _sys.procedures_ to see if the stored procedure exists before trying to drop it.
+         
+         ```
+            IF EXISTS(SELECT 1 FROM sys.procedures WHERE [Name] = 'dbo.SelectContacts')
+            BEGIN;
+               DROP PROCEDURE dbo.SelectContacts;
+            END;
+         ```
+   
    - Summary
+   
+      - What a stored procedure is.
+      - Benefits of stored procedure (Security and Code re-use).
+      - Avoid bad practises like cursors!
+      - Installing SQL Server.
+      - T-SQL procedure statements
+      - Managing procedures in Management Studio
+      
    
    

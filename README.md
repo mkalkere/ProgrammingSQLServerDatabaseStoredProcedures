@@ -527,4 +527,242 @@
       - Retrieving identity values
       - Nesting Stored Procedure
       
+## Table Valued Parameters and Refactoring
+
+- Introduction
+
+   - Refactoring a Stored Procedure
+   - Table-valued Type
+   - Calling a Table-valued Type Stored Procedure
+   - (Bad) Alternatives to Table-valued Types   
+
+- Inheriting a Stored Procedure
+
+   - Using a Cursor
+      - Declare cursor
+      - Open cursor
+      - Try to obtain the first record
+      - Check if record found
+      - Process record if found
+      - Obtain next record
+      - Check if record found
+      - Repeat until all records read
+      - Close cursor
+      - Deallocate cursor
+   
+   ```
+      USE Contacts;
+
+      DROP PROCEDURE IF EXISTS dbo.InsertContactNotes;
+
+      GO
+
+      --EXEC dbo.InsertContactNotes @ContactId = 22, @Notes = 'Note1,Note2,Note3'
+      CREATE PROCEDURE dbo.InsertContactNotes
+      (
+         @ContactId		INT,
+         @Notes			VARCHAR(MAX)
+      )
+      AS
+      BEGIN;
+      SET NOCOUNT ON;
+
+      DECLARE @NoteTable TABLE(Note VARCHAR(MAX));
+      DECLARE @NoteValue VARCHAR(MAX);
+
+      INSERT INTO @NoteTable(Note)
+      SELECT Value
+         FROM STRING_SPLIT(@Notes,',');
+
+      DECLARE NoteCursor CURSOR FOR
+         SELECT Note FROM @NoteTable;
+
+      OPEN NoteCursor
+      FETCH NEXT FROM NoteCursor INTO @NoteValue;
+
+      WHILE @@FETCH_STATUS = 0
+      BEGIN;
+         INSERT INTO dbo.ContactNotes(ContactId,Notes)
+            VALUES(@ContactID,@NoteValue);
+
+         FETCH NEXT FROM NoteCursor INTO @NoteValue;
+      END;
+
+      CLOSE NoteCursor;
+      DEALLOCATE NoteCursor;
+
+      SELECT ContactId,Notes FROM ContactNotes WHERE ContactId = @ContactID;
+
+      SET NOCOUNT OFF;
+      END;
+   ```
+
+- Alternatives to Cursors
+
+   - While Loop (can perfor a little better that a cursor. It does not have the overhead of setting up and closing the cursor)
+      ```
+         --//Using WHILE Loop
+            WHILE((SELECT COUNT(*) FROM @NoteTable) > 0)
+            BEGIN;
+               SELECT TOP 1 @NoteValue = Note FROM @NoteTable;
+
+               INSERT INTO dbo.ContactNotes(ContactId,Notes)
+                  VALUES(@ContactID,@NoteValue);
+
+               DELETE FROM @NoteTable WHERE Note = @NoteValue;
+
+            END;
+      ```
+   
+   - SET-based logic.
+      - Relational databases are designed to work with thousands of records at a time not on one record at a time.
       
+      ```
+         INSERT INTO dbo.ContactNotes(ContactId,Notes)
+            SELECT @ContactId, Value
+               FROM STRING_SPLIT(@Notes,',');
+      ```
+    
+- User-defined Data Types
+   
+   - T-SQL Create Type Statement
+      Use to create aliases for primitive types, or to create a custom data types.
+      
+      ```
+         CREATE TYPE <name of type>
+         FROM <base type>;
+         
+         Example:
+            
+            USE Contacts;
+            GO
+
+            CREATE TYPE dbo.DrivingLicense
+            FROM CHAR(16) NOT NULL;
+
+            DECLARE @DL DrivingLicense = 'ABCXYZ98743US140';
+
+            SELECT @DL;
+         
+         CREATE TYPE<name of type>
+         AS TABLE
+         (  
+            Column definations here...
+         );
+      ```
+   - Custom Types exists within individual databases.
+   - T-SQL Drop Type Statement
+      - Use to drop types
+      - Atype can only be dropped if no other objects depend on it
+      `DROP TYPE IF EXISTS <name of type>; `
+  
+   - User-defined Table Types
+      - User-defined table type is nothing more than a table variable. Because it is explicitly defined SQL Server allows it be used like any other datatype.
+      - The type may contain as may columns as you want and you can insert as many rows as you want to it.
+      - This gives a consistent way to passing data to stored procedures and also ensures the calling application simply needs to create a data table using the same structure, then pass the data table as a structured parameter to the stored procedure.
+      - Table-valued Parameters (TVP).
+         ```
+            USE Contacts;
+
+            DROP TYPE IF EXISTS dbo.ContactNote;
+
+            GO
+
+            CREATE TYPE dbo.ContactNote
+            AS TABLE
+            (
+               Note VARCHAR(MAX) NOT NULL 
+            );
+
+         ```
+            - You can index, constrain and define primary keys on TVP if you want.
+            - TVP must be defined with READONLY Option.
+            
+               Data held in the TVP is stored in the SQL Servers TempDB. This meanse the data only needs to be held in only one pace. It is not explicitly passed into the stored procedure with TVP. Rather passed by reference.
+               
+               The data is stored in the TempDB and the reference is passed to the stored procedure and the data can be read from TempDB in the stored procedure.
+               
+               This is done to prevent the large sets of data from continually being created, which could have a negative impact on the system performance.
+               A TVP could contain a lot of data, so you really don't want to create a multiple copies of that data.
+      - Creating a Copy From READONLY
+            The data in the READONLY table type cannot be modified Inserting the records into a different variable of the same type will support data modifications.
+               
+               ```
+                  CREATE PROCEDURE dbo.InsertContactNotes
+                  (@ContactId INT, @Notes ContactNote READONLY)
+                  AS
+                  BEGIN;
+                  
+                  DECLARE @NotesUpdate ContactNote;
+                  
+                  INSERT INTO @NotesUpdate(Note)
+                     SELECT Note FROM @ContactNotes;
+               ```
+        ```
+         --//Using TVP
+         USE Contacts;
+
+         DROP PROCEDURE IF EXISTS dbo.InsertContactNotes;
+
+         GO
+
+         CREATE PROCEDURE dbo.InsertContactNotes
+         (
+            @ContactId		INT,
+            @Notes			ContactNote READONLY
+         )
+         AS
+         BEGIN;
+         SET NOCOUNT ON;
+
+         INSERT INTO dbo.ContactNotes(ContactId,Notes)
+            SELECT @ContactId, Note
+               FROM @Notes;
+
+         SELECT * FROM ContactNotes WHERE ContactId = @ContactID
+            ORDER BY NoteId DESC;
+
+         SET NOCOUNT OFF;
+         END;
+        ```
+             
+
+- Calling a Stored Procedure with Table-Valued Parameter
+
+   ```
+      DECLARE @TempNotes  ContactNote;
+
+      INSERT INTO @TempNotes (Note)
+      VALUES
+      ('Hi, Peter Called.'),
+      ('Quick note to let you know Jo knows you to ring her. She rang at 14:30'),
+      ('Terri asked about the quote, I have asked her to ring back tomorrow.');
+
+      EXEC dbo.InsertContactNotes
+            @ContactId = 23,
+            @Notes = @TempNotes;
+   ```
+   - Creating a Multi-column Type
+      Including a ContactId column in the Table-Valued Type.
+      
+      ```
+         USE Contacts;
+
+         DROP TYPE IF EXISTS dbo.ContactNote;
+
+         CREATE TYPE dbo.ContactNote
+         AS TABLE
+         (
+            ContactId		INT,
+            Note			VARCHAR(MAX) NOT NULL
+         ); 
+      ```  
+   
+- Summary
+   
+   - Passing multiple records - badly
+   - Don't use cursore
+   - While loops
+   - Table-valued Parameters in stored procedures
+
+   

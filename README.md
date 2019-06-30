@@ -765,4 +765,13 @@
    - While loops
    - Table-valued Parameters in stored procedures
 
-   
+## Debigging and Troubleshooting Stored Procedures
+
+- Introduction
+- The Print Statement
+- Debugging with SQL Server Management Studio
+- Handling Errors with Try/Catch
+- Return Codes
+- Handling Failed Transactions
+- Defensive Coding
+- Summary

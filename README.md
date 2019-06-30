@@ -186,7 +186,7 @@
          USE Contacts;
 
          EXEC dbo.InsertContact
-        ```
+    ```
    
    - Adding Parameters to a Stored Procedure
    
@@ -355,7 +355,176 @@
       ```
    
    - Output Parameters
+   
+      ```
+         USE Contacts;
+
+         GO
+
+         --// Output Parameter
+         CREATE OR ALTER PROCEDURE dbo.InsertContact
+         (
+            @FirstName				VARCHAR(40),
+            @LastName				VARCHAR(40), 
+            @DateOfBirth			DATE = NULL,
+            @AllowContactByPhone	BIT,
+            @ContactId				INT OUTPUT
+         )
+         AS
+         BEGIN;
+
+
+            INSERT INTO dbo.Contacts (FirstName,LastName,DateOfBirth,AllowContactByPhone)
+               VALUES (@FirstName,@LastName,@DateOfBirth,@AllowContactByPhone);
+
+            SELECT @ContactId = SCOPE_IDENTITY();
+
+            SELECT ContactId,FirstName,LastName,DateOfBirth,AllowContactByPhone
+               FROM dbo.Contacts
+            WHERE ContactId = @ContactId;
+         END;
+         
+         --//Retrieving Output Parameters
+         USE Contacts;
+
+         DECLARE @ContactIdOut INT;
+
+         EXEC dbo.InsertContact  @FirstName = 'Marold', @LastName = 'Lloyd',@AllowContactByPhone = 0,@ContactId = @ContactIdOut OUTPUT;
+
+         SELECT * FROM Contacts WHERE ContactId = @ContactIdOut ORDER BY ContactId  DESC
+
+         SELECT @ContactIdOut
+         
+      ```
+            
    - Using SET Operations
+   
+      - SET Options only effect the current session.
+         - SET DATEFORMAT        - _Determines the format in which the dates must be specified_
+         - SET IDENTITY_INSERT   - _Allows the current executing statement to manually insert the value into the identity column_
+         - SET NOCOUNT           - _Set Option is the command used to turn on or off the informational messages_
+            SET NOCOUNT {ON|OFF} - ON stops the informational messages being returned and OFF turns on the informational messages.
+            IF SET NOCOUNT OFF is not set at the begining of the stored procedure then all the informational messages will be sent over to the calling program. To get a slight performance gain turn them off. It is a really good practice to _SET NOCOUNT ON_ at the top of every stored procedure.
+            
+            _SET NOCOUNT OFF_ when testing or debugging.
+            It is a good practise to enable the _SET NOCOUNT OFF_ at the end of the stored procedure.  
+            
+            ```
+               ....
+               SET NOCOUNT ON;
+               ...
+               ...
+               
+               SETNOCOUNT OFF;
+            ```
+   
    - Calling a Procedure from Another Procedure
+   
+      ```
+         --//Calling a Procedure from Another Procedure
+         USE Contacts;
+
+         DROP PROCEDURE IF EXISTS dbo.SelectContact;
+
+         GO
+
+         CREATE PROCEDURE dbo.SelectContact
+         (
+            @ContactId INT
+         )
+         AS
+         BEGIN;
+         SET NOCOUNT ON;
+
+            SELECT 
+               FirstName
+               ,LastName
+               ,DateOfBirth
+               ,AllowContactByPhone
+               ,CreatedDate
+            FROM Contacts
+            WHERE ContactId = @ContactId
+
+         SET NOCOUNT OFF;
+         END;
+         
+         USE Contacts;
+
+         GO
+         
+         CREATE OR ALTER PROCEDURE dbo.InsertContact
+         (
+            @FirstName				VARCHAR(40),
+            @LastName				VARCHAR(40), 
+            @DateOfBirth			DATE = NULL,
+            @AllowContactByPhone	BIT,
+            @ContactId				INT OUTPUT
+         )
+         AS
+         BEGIN;
+         SET NOCOUNT ON;
+
+            INSERT INTO dbo.Contacts (FirstName,LastName,DateOfBirth,AllowContactByPhone)
+               VALUES (@FirstName,@LastName,@DateOfBirth,@AllowContactByPhone);
+
+            SELECT @ContactId = SCOPE_IDENTITY();
+            --//Calling a Stored Procedure
+            EXEC dbo.SelectContact @ContactId = @ContactId
+
+         SET NOCOUNT OFF;
+
+         END;         
+         
+      ```
+            
    - Adding Business Logic
+      
+      - T-SQL support flow control statements
+         - IF statement
+         - WHILE loop
+         
+      - Stored procedures must always return the consistent output regardless of the control flow inside the procedure. This allows the calling program to handle the output.
+      
+      ```
+         --// Adding Business Logic
+         USE Contacts;
+
+         GO
+
+         CREATE OR ALTER PROCEDURE dbo.InsertContact
+         (
+            @FirstName				VARCHAR(40),
+            @LastName				VARCHAR(40), 
+            @DateOfBirth			DATE = NULL,
+            @AllowContactByPhone	BIT,
+            @ContactId				INT OUTPUT
+         )
+         AS
+         BEGIN;
+         SET NOCOUNT ON;
+
+            IF NOT EXISTS(SELECT 1 FROM dbo.Contacts 
+                        WHERE FirstName = @FirstName AND LastName = @LastName AND (DateOfBirth = @DateOfBirth OR @DateOfBirth IS NULL))
+            BEGIN; 
+            INSERT INTO dbo.Contacts (FirstName,LastName,DateOfBirth,AllowContactByPhone)
+               VALUES (@FirstName,@LastName,@DateOfBirth,@AllowContactByPhone);
+            END	;
+
+            SELECT @ContactId = SCOPE_IDENTITY();
+            --//Calling a Stored Procedure
+            EXEC dbo.SelectContact @ContactId = @ContactId
+
+         SET NOCOUNT OFF;
+
+         END;
+      ```      
+   
    - Summary
+      
+      - Implementation options
+      - Parameter-less stored procedure
+      - Mandatory and Optional Parameters
+      - Retrieving identity values
+      - Nesting Stored Procedure
+      
+      
